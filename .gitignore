@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+# Dev files
+dev.cpp
+tempCodeRunnerFile.cpp
+
+# Dev folders
+.vscode
+\build\
+TODO.md
+dev.cpp
