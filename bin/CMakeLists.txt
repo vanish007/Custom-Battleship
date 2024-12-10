@@ -1,8 +1,14 @@
 find_package(SFML 2.6.2 COMPONENTS audio system REQUIRED)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp main.hpp)
 
-target_link_libraries(${PROJECT_NAME} sfml-audio sfml-system)
+target_link_libraries(${PROJECT_NAME} 
+                            sfml-audio 
+                            sfml-system
+                            GameStats
+                            Strategy
+                            Field
+                      )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
