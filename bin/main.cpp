@@ -412,7 +412,7 @@ private:
             }
         }
 
-        for (int64_t i = x; i < coord_x_; ++i) {
+        for (int64_t i = x; i < coord_y_; ++i) {
             if (field_[i][y].second) {
                 if (!field_[i][y].first) {
                     return false;
@@ -432,7 +432,7 @@ private:
             }
         }
 
-        for (int64_t j = y; j < coord_y_; ++j) {
+        for (int64_t j = y; j < coord_x_; ++j) {
             if (field_[x][j].second) {
                 if (!field_[x][j].first) {
                     return false;
