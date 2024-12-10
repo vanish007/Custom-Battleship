@@ -5,6 +5,7 @@
 #include <vector>
 #include <deque>
 #include <cstdint>
+#include <filesystem>
 
 // #include <SFML/Audio.hpp>
 
@@ -64,10 +65,12 @@ public:
 
     void SetWidth(int64_t x) {
         coord_x_ = x;
+        stats_.push_back(std::to_string(x));
     }
 
     void SetHeight(int64_t y) {
         coord_y_ = y;
+        stats_.push_back(std::to_string(y));
     }
 
     void CreateEmptyField(int64_t x, int64_t y) {
@@ -217,6 +220,10 @@ public:
 
                         if (CanPlaceShip(x, y, ship_size)) {
                             PlaceShip(x, y, ship_size);
+                            stats_.push_back(std::to_string(ship_size));
+                            stats_.push_back("v");
+                            stats_.push_back(std::to_string(x));
+                            stats_.push_back(std::to_string(y));
                             placed = true;
                             break;
                         }
@@ -291,24 +298,11 @@ public:
         return true;
     }
 
-    ~CField() {
         for (size_t i = 0; i < coord_y_; ++i) {
             delete [] field_[i];
         }
         delete [] field_;
     }
-private:
-    int64_t coord_x_;
-    int64_t coord_y_;
-    std::pair<bool, bool>** field_;
-
-    int64_t total_ship_cnt_ = 0;
-    int64_t one_ship_cnt_ = 0;
-    int64_t two_ship_cnt_ = 0;
-    int64_t three_ship_cnt_ = 0;
-    int64_t four_ship_cnt_ = 0;
-
-    std::vector<std::string> stats_;
 
     void AddShips_(std::vector<std::string> ships) {
         coord_x_ = std::stoi(ships[0]);
@@ -324,6 +318,18 @@ private:
             PlaceShip_(ships[i], ships[i+1], ships[i+2], ships[i+3]);
         }
     }
+private:
+    int64_t coord_x_;
+    int64_t coord_y_;
+    std::pair<bool, bool>** field_;
+
+    int64_t total_ship_cnt_ = 0;
+    int64_t one_ship_cnt_ = 0;
+    int64_t two_ship_cnt_ = 0;
+    int64_t three_ship_cnt_ = 0;
+    int64_t four_ship_cnt_ = 0;
+
+    std::vector<std::string> stats_;
 
     void PlaceShip_(std::string s1, std::string s2, 
                     std::string s3, std::string s4) {
@@ -441,47 +447,42 @@ public:
         } else if (result == "hit") {
             field.MarkAsShip(last_shot_.first, last_shot_.second);
 
-            if (ship_is_vertical_) {
-                AddNeighborCellsToTarget(last_shot_.first, last_shot_.second + 1, field);
-                AddNeighborCellsToTarget(last_shot_.first, last_shot_.second - 1, field);
+            hits_.push_back(last_shot_);
+
+            if (hits_.size() > 1) {
+                DetermineShipOrientation();
+                if (ship_is_vertical_) {
+                    while (target_cells_.front().first != last_shot_.first && !target_cells_.empty()) {
+                        target_cells_.pop_front();
+                    }
+                     while (target_cells_.back().first != last_shot_.first && !target_cells_.empty()) {
+                        target_cells_.pop_back();
+                    }
+                    AddNeighborCellsToTarget(last_shot_.first, last_shot_.second + 1, field);
+                    AddNeighborCellsToTarget(last_shot_.first, last_shot_.second - 1, field);
+                } else {
+                    while (target_cells_.front().second != last_shot_.second && !target_cells_.empty()) {
+                        target_cells_.pop_front();
+                    }
+                     while (target_cells_.back().second != last_shot_.second && !target_cells_.empty()) {
+                        target_cells_.pop_back();
+                    }
+                    AddNeighborCellsToTarget(last_shot_.first + 1, last_shot_.second, field);
+                    AddNeighborCellsToTarget(last_shot_.first - 1, last_shot_.second, field);
+                }
             } else {
-                AddNeighborCellsToTarget(last_shot_.first + 1, last_shot_.second, field);
-                AddNeighborCellsToTarget(last_shot_.first - 1, last_shot_.second, field);
+                    AddNeighborCellsToTarget(last_shot_.first, last_shot_.second + 1, field);
+                    AddNeighborCellsToTarget(last_shot_.first, last_shot_.second - 1, field);
+                    AddNeighborCellsToTarget(last_shot_.first + 1, last_shot_.second, field);
+                    AddNeighborCellsToTarget(last_shot_.first - 1, last_shot_.second, field);
             }
         } else if (result == "kill") {
             field.MarkAsShip(last_shot_.first, last_shot_.second);
-
-            std::vector<std::pair<int64_t, int64_t>> ship_cells;
-
-            for (int64_t x = 0; x < field.GetWidth(); ++x) {
-                for (int64_t y = 0; y < field.GetHeight(); ++y) {
-                    if (field.IsShip(x, y)) {
-                        ship_cells.push_back({x, y});
-                    }
-                }
-            }
-
-            const int64_t dx[] = {0, 0, -1, 1, -1, -1, 1, 1};
-            const int64_t dy[] = {-1, 1, 0, 0, -1, 1, -1, 1};
-
-            for (const auto& cell : ship_cells) {
-                int64_t ship_x = cell.first;
-                int64_t ship_y = cell.second;
-
-                for (int i = 0; i < 8; ++i) {
-                    int64_t nx = ship_x + dx[i];
-                    int64_t ny = ship_y + dy[i];
-
-                    if (nx >= 0 && nx < field.GetWidth() && ny >= 0 && ny < field.GetHeight()) {
-                        field.MarkAsHit(nx, ny);
-                    }
-                }
-            }
-
-            target_cells_.clear();
-            hits_.clear();
+            MaskAroundShip_(field);
             ship_is_vertical_ = false;
             ship_direction_ = 0;
+            target_cells_.clear();
+            hits_.clear();
         }
     }
 
@@ -497,7 +498,17 @@ private:
     std::vector<std::pair<int64_t, int64_t>> hits_;
     std::pair<int64_t, int64_t> last_shot_ = {-1, -1};
 
-    void MaskAroundShip(CField& field) {
+    void DetermineShipOrientation() {
+        if (hits_.size() >= 2) {
+            if (hits_[0].first == hits_[1].first) {
+                ship_is_vertical_ = true;
+            } else if (hits_[0].second == hits_[1].second) {
+                ship_is_vertical_ = false;
+            }
+        }
+    }
+
+    void MaskAroundShip_(CField& field) {
         const int64_t dx[] = {-1, 0, 1, -1, 1, -1, 0, 1};
         const int64_t dy[] = {-1, -1, -1, 0, 0, 1, 1, 1};
 
@@ -518,7 +529,8 @@ private:
 
 
     void AddNeighborCellsToTarget(int64_t x, int64_t y, CField& field) {
-        if (x >= 0 && x < field.GetWidth() && y >= 0 && y < field.GetHeight() && !field.IsAlreadyHit(x, y)) {
+        if (x >= 0 && x < field.GetWidth() && y >= 0 && y < field.GetHeight() 
+            && !field.IsAlreadyHit(x, y) && !field.IsShip(x, y)) {
             target_cells_.push_back({x, y});
         }
     }
@@ -655,11 +667,14 @@ int main() {
             if (!is_master) {
                 CreateSlaveGame(my_field);
             }
-            my_field.PrintField();
             CreateEnemyGame(enemy_field, my_field);
             std::cout << "ok" << std::endl;
         } else if(cmd_list[0] == "create" && cmd_list.size() == 1) {
             std::cout << "Choose your role: create [master/slave]" << std::endl;
+        } else if(cmd_list[0] == "dump" && cmd_list.size() == 1) {
+            std::cout << "Please input a path" << std::endl;
+        } else if(cmd_list[0] == "dump" && cmd_list.size() == 2) {
+            std::cout << "Please input a path" << std::endl;
         } else if(cmd_list[0] == "create") {
             if (cmd_list[1] == "master" && cmd_list.size() == 2) {
                 is_master = true;
@@ -736,11 +751,6 @@ int main() {
             std::cout << my_field.Hit(std::stoi(cmd_list[1]), 
                                       std::stoi(cmd_list[2])) 
                       << std::endl;
-            std::cout << "###" << std::endl;
-            my_field.PrintField();
-            std::cout << "###" << std::endl;
-        } else if(cmd_list[0] == "start" && cmd_list.size() == 1) {
-            std::cout << "ok" << std::endl;
         } else if(cmd_list[0] == "stop" && cmd_list.size() == 1) {
             std::cout << "ok" << std::endl;
         } else if(cmd_list[0] == "finished" && cmd_list.size() == 1) {
@@ -804,7 +814,7 @@ int main() {
         //     } else {
         //         std::cout << "unknown sound command: " << cmd_list[1] 
         //                   << std::endl;
-        //     }
+            // }
         // } 
         else {
             std::cerr << "'";
