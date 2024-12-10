@@ -5,9 +5,11 @@
 #include <vector>
 #include <deque>
 #include <cstdint>
-#include <filesystem>
+#include <fstream>
 
-// #include <SFML/Audio.hpp>
+#define _DEV_
+
+#include <SFML/Audio.hpp>
 
 class CGameStats{
 public:
@@ -24,27 +26,27 @@ public:
     }
 
     bool IsGameWon() const {
-        if (is_game_in_process_ == false) {
+        if (is_game_in_process_ == true) {
             return false;
         }
         return is_game_won_;
     }
 
     void SetGameWon(bool value = true) {
-        is_game_lost_ = !value;
-        is_game_won_ = value;
+        is_game_lost_ = false;
+        is_game_won_ = true;
     }
     
     bool IsGameLost() const {
-        if (is_game_in_process_ == false) {
+        if (is_game_in_process_ == true) {
             return false;
         }
         return is_game_lost_;
     }
 
     void SetGameLost(bool value = true) {
-        is_game_won_ = !value;
-        is_game_lost_ = value;
+        is_game_won_ = false;
+        is_game_lost_ = true;
     }
 
 private:
@@ -53,8 +55,27 @@ private:
     bool is_game_lost_ = false;
 };
 
+CGameStats game_stats;
+
 class CField {
 public:
+    void Dump(std::ofstream& out) {
+        out << stats_[0] << ' ' << stats_[1] << std::endl;
+        for (size_t i = 2; i < stats_.size(); i += 4) {
+            out << stats_[i] << ' ' << stats_[i+1] << ' ' 
+                << stats_[i+2] << ' ' << stats_[i+3] << std::endl;
+        }
+    }
+
+    void Load(std::ifstream& in) {
+        std::string cmd;
+        std::vector<std::string> vec;
+        while (in >> cmd) {
+            vec.push_back(cmd);
+        }
+        AddShips_(vec);
+    }
+
     int64_t GetWidth() {
         return coord_x_;
     }
@@ -99,12 +120,20 @@ public:
         field_[y][x].first = true;
     }
 
+    void KillShip() {
+        total_ship_cnt_ = std::max(0LL, total_ship_cnt_-1);
+    }
+
     std::string Hit(int64_t x, int64_t y) {
         field_[y][x].first = true;
         if (field_[y][x].second) {
             if (CheckForKill_(y, x)) {
+                total_ship_cnt_ = std::max(0LL, total_ship_cnt_-1);
+                if (total_ship_cnt_ == 0) {
+                    game_stats.EndGame();
+                    game_stats.SetGameLost();
+                }
                 return "kill";
-                total_ship_cnt_ = std::max(total_ship_cnt_, total_ship_cnt_-1);
             } else {
                 return "hit";
             }
@@ -121,8 +150,9 @@ public:
         return total_ship_cnt_;
     }
 
-        void SetOneShipCnt(int64_t value) {
+    void SetOneShipCnt(int64_t value) {
         one_ship_cnt_ = value;
+        total_ship_cnt_ += value;
     }
 
     int64_t GetOneShipCnt() {
@@ -131,6 +161,7 @@ public:
 
     void SetTwoShipCnt(int64_t value) {
         two_ship_cnt_ = value;
+        total_ship_cnt_ += value;
     }
 
     int64_t GetTwoShipCnt() {
@@ -139,6 +170,7 @@ public:
 
     void SetThreeShipCnt(int64_t value) {
         three_ship_cnt_ = value;
+        total_ship_cnt_ += value;
     }
 
     int64_t GetThreeShipCnt() {
@@ -147,6 +179,7 @@ public:
 
     void SetFourShipCnt(int64_t value) {
         four_ship_cnt_ = value;
+        total_ship_cnt_ += value;
     }
 
     int64_t GetFourShipCnt() {
@@ -298,25 +331,19 @@ public:
         return true;
     }
 
+    void SetEnemy() {
+        is_enemy = true;
+    }
+
+    bool IsEnemy() {
+        return is_enemy;
+    }
+
+    ~CField() {
         for (size_t i = 0; i < coord_y_; ++i) {
             delete [] field_[i];
         }
         delete [] field_;
-    }
-
-    void AddShips_(std::vector<std::string> ships) {
-        coord_x_ = std::stoi(ships[0]);
-        stats_.push_back(ships[0]);
-        coord_y_ = std::stoi(ships[1]);
-        stats_.push_back(ships[1]);
-        CreateEmptyField(coord_x_, coord_y_);
-        for (size_t i = 2; i < ships.size(); i += 4) {
-            stats_.push_back(ships[i]);
-            stats_.push_back(ships[i+1]);
-            stats_.push_back(ships[i+2]);
-            stats_.push_back(ships[i+3]);
-            PlaceShip_(ships[i], ships[i+1], ships[i+2], ships[i+3]);
-        }
     }
 private:
     int64_t coord_x_;
@@ -331,9 +358,26 @@ private:
 
     std::vector<std::string> stats_;
 
+    bool is_enemy = false;
+
+    void AddShips_(std::vector<std::string> ships) {
+        coord_x_ = std::stoull(ships[0]);
+        stats_.push_back(ships[0]);
+        coord_y_ = std::stoull(ships[1]);
+        stats_.push_back(ships[1]);
+        CreateEmptyField(coord_x_, coord_y_);
+        for (size_t i = 2; i < ships.size(); i += 4) {
+            stats_.push_back(ships[i]);
+            stats_.push_back(ships[i+1]);
+            stats_.push_back(ships[i+2]);
+            stats_.push_back(ships[i+3]);
+            PlaceShip_(ships[i], ships[i+1], ships[i+2], ships[i+3]);
+        }
+    }
+
     void PlaceShip_(std::string s1, std::string s2, 
                     std::string s3, std::string s4) {
-        short size = std::stoi(s1);
+        short size = std::stoull(s1);
         total_ship_cnt_ += 1;
         if (size == 1) {
             ++one_ship_cnt_;
@@ -344,8 +388,8 @@ private:
         } else if (size == 4) {
             ++four_ship_cnt_;
         }
-        short x = std::stoi(s3);
-        short y = std::stoi(s4);
+        short x = std::stoull(s3);
+        short y = std::stoull(s4);
         if (s2 == "v") {
             for (int i = y; i < y+size; ++i) {
                 field_[i][x].second = true;
@@ -452,19 +496,19 @@ public:
             if (hits_.size() > 1) {
                 DetermineShipOrientation();
                 if (ship_is_vertical_) {
-                    while (target_cells_.front().first != last_shot_.first && !target_cells_.empty()) {
+                    while (!target_cells_.empty() && target_cells_.front().first != last_shot_.first) {
                         target_cells_.pop_front();
                     }
-                     while (target_cells_.back().first != last_shot_.first && !target_cells_.empty()) {
+                     while (!target_cells_.empty() && target_cells_.back().first != last_shot_.first) {
                         target_cells_.pop_back();
                     }
                     AddNeighborCellsToTarget(last_shot_.first, last_shot_.second + 1, field);
                     AddNeighborCellsToTarget(last_shot_.first, last_shot_.second - 1, field);
                 } else {
-                    while (target_cells_.front().second != last_shot_.second && !target_cells_.empty()) {
+                    while (!target_cells_.empty() && target_cells_.front().second != last_shot_.second) {
                         target_cells_.pop_front();
                     }
-                     while (target_cells_.back().second != last_shot_.second && !target_cells_.empty()) {
+                     while (!target_cells_.empty() && target_cells_.back().second != last_shot_.second) {
                         target_cells_.pop_back();
                     }
                     AddNeighborCellsToTarget(last_shot_.first + 1, last_shot_.second, field);
@@ -477,7 +521,12 @@ public:
                     AddNeighborCellsToTarget(last_shot_.first - 1, last_shot_.second, field);
             }
         } else if (result == "kill") {
-            field.MarkAsShip(last_shot_.first, last_shot_.second);
+            field.MarkAsShip(last_shot_.first, last_shot_.second);  
+            field.KillShip();
+            if (field.GetTotalShipCnt() == 0) {
+                game_stats.EndGame();
+                game_stats.SetGameWon();
+            }
             MaskAroundShip_(field);
             ship_is_vertical_ = false;
             ship_direction_ = 0;
@@ -641,16 +690,18 @@ int main() {
     int64_t three_ship_cnt_;
     int64_t four_ship_cnt_;
 
-    // sf::Music music;
-    // music.openFromFile("resources/heartbeat.wav");
-    // music.setLoop(true);
-    // double previous_volume = 30.0f;
-    // music.setVolume(previous_volume);
-    // music.play();
+    sf::Music music;
+    music.openFromFile("resources/heartbeat.wav");
+    music.setLoop(true);
+    double previous_volume = 30.0f;
+    music.setVolume(previous_volume);
+    music.play();
 
-    CGameStats game_stats;
     CField my_field;
+    my_field.SetTotalShipCnt(0);
     CField enemy_field;
+    enemy_field.SetTotalShipCnt(0);
+    enemy_field.SetEnemy();
     CStrategy strategy;
     
     bool is_master = false;
@@ -668,13 +719,40 @@ int main() {
                 CreateSlaveGame(my_field);
             }
             CreateEnemyGame(enemy_field, my_field);
+            #ifdef _DEV_
+                std::cout << "My field:" << std::endl;
+                my_field.PrintField();
+                std::cout << "Enemy field:" << std::endl;
+                enemy_field.PrintField();
+            #endif
             std::cout << "ok" << std::endl;
         } else if(cmd_list[0] == "create" && cmd_list.size() == 1) {
             std::cout << "Choose your role: create [master/slave]" << std::endl;
         } else if(cmd_list[0] == "dump" && cmd_list.size() == 1) {
             std::cout << "Please input a path" << std::endl;
         } else if(cmd_list[0] == "dump" && cmd_list.size() == 2) {
+            std::string file_name = cmd_list[1];
+
+            if (!std::fstream(file_name)) {
+                std::cout << "failed" << std::endl;
+            } else {
+                std::ofstream fout(file_name);
+                my_field.Dump(fout);
+                std::cout << "ok" << std::endl;
+            }
+        } else if(cmd_list[0] == "load" && cmd_list.size() == 1) {
             std::cout << "Please input a path" << std::endl;
+        } else if (cmd_list[0] == "load" && cmd_list.size() == 2) {
+            std::string file_name = cmd_list[1];
+
+            std::ifstream fin(file_name);
+            if (!fin.is_open()) {
+                std::cout << "failed" << std::endl;
+            } else {
+                my_field.Load(fin);
+                is_master = true;
+                std::cout << "ok"  << std::endl;
+            }
         } else if(cmd_list[0] == "create") {
             if (cmd_list[1] == "master" && cmd_list.size() == 2) {
                 is_master = true;
@@ -718,25 +796,30 @@ int main() {
                 }
             } else if(cmd_list[1] == "result" && cmd_list.size() == 3) {
                 strategy.ShotResult(cmd_list[2], enemy_field);
-                enemy_field.PrintField();
+                #ifdef _DEV_
+                    std::cout << "My field:" << std::endl;
+                    my_field.PrintField();
+                    std::cout << "Enemy field:" << std::endl;
+                    enemy_field.PrintField();
+                #endif
             } else if(cmd_list[1] == "width" && cmd_list.size() == 3) {
-                my_field.SetWidth(std::stoi(cmd_list[2]));
+                my_field.SetWidth(std::stoull(cmd_list[2]));
                 std::cout << "ok" << std::endl;
             } else if(cmd_list[1] == "height" && cmd_list.size() == 3) {
-                my_field.SetHeight(std::stoi(cmd_list[2]));
+                my_field.SetHeight(std::stoull(cmd_list[2]));
                 std::cout << "ok" << std::endl;
              } else if (cmd_list[1] == "count" && cmd_list.size() == 4) {
                 if (cmd_list[2] == "1") {
-                    my_field.SetOneShipCnt(std::stoi(cmd_list[3]));
+                    my_field.SetOneShipCnt(std::stoull(cmd_list[3]));
                     std::cout << "ok" << std::endl;
                 } else if (cmd_list[2] == "2") {
-                    my_field.SetTwoShipCnt(std::stoi(cmd_list[3]));
+                    my_field.SetTwoShipCnt(std::stoull(cmd_list[3]));
                     std::cout << "ok" << std::endl;
                 } else if (cmd_list[2] == "3") {
-                    my_field.SetThreeShipCnt(std::stoi(cmd_list[3]));
+                    my_field.SetThreeShipCnt(std::stoull(cmd_list[3]));
                     std::cout << "ok" << std::endl;
                 } else if (cmd_list[2] == "4") {
-                    my_field.SetFourShipCnt(std::stoi(cmd_list[3]));
+                    my_field.SetFourShipCnt(std::stoull(cmd_list[3]));
                     std::cout << "ok" << std::endl;
                 } else {
                     std::cout << "Wrong ship size" << std::endl;
@@ -748,9 +831,15 @@ int main() {
         } else if(cmd_list[0] == "shot" && cmd_list.size() == 2) {
             std::cout << "Please enter second coordinate" << std::endl;
         } else if(cmd_list[0] == "shot" && cmd_list.size() == 3) {
-            std::cout << my_field.Hit(std::stoi(cmd_list[1]), 
-                                      std::stoi(cmd_list[2])) 
+            std::cout << my_field.Hit(std::stoull(cmd_list[1]), 
+                                      std::stoull(cmd_list[2])) 
                       << std::endl;
+            #ifdef _DEV_
+                std::cout << "My field:" << std::endl;
+                my_field.PrintField();
+                std::cout << "Enemy field:" << std::endl;
+                enemy_field.PrintField();
+            #endif
         } else if(cmd_list[0] == "stop" && cmd_list.size() == 1) {
             std::cout << "ok" << std::endl;
         } else if(cmd_list[0] == "finished" && cmd_list.size() == 1) {
@@ -760,62 +849,64 @@ int main() {
                 std::cout << "yes" << std::endl;
             }
         } else if(cmd_list[0] == "win" && cmd_list.size() == 1) {
-            if (game_stats.IsGameInProcess() || !(game_stats.IsGameWon())) {
+            if (game_stats.IsGameInProcess() || game_stats.IsGameLost()) {
                 std::cout << "no" << std::endl;
             } else {
+                std::cout << game_stats.IsGameLost() << std::endl;
                 std::cout << "yes" << std::endl;
             }
         } else if(cmd_list[0] == "lose" && cmd_list.size() == 1) {
-            if (game_stats.IsGameInProcess() || !(game_stats.IsGameLost())) {
+            if (game_stats.IsGameInProcess() || game_stats.IsGameWon()) {
                 std::cout << "no" << std::endl;
             } else {
+                std::cout << game_stats.IsGameWon() << std::endl;
                 std::cout << "yes" << std::endl;
             }
         } else if(cmd_list[0] == "exit" && cmd_list.size() == 1) {
             std::cout << "ok" << std::endl;
             break;
         } 
-        // else if (cmd_list[0] == "sound" && cmd_list.size() == 1) {
-        //     std::cout << "sound control commands:" << std::endl;
-        //     std::cout << "mute   - turn off the sound" << std::endl;
-        //     std::cout << "unmute - restore the previous sound volume" 
-        //               << std::endl;
-        //     std::cout << "pause  - pause the sound playback" << std::endl;
-        //     std::cout << "resume - resume sound playback" << std::endl;
-        //     std::cout << "down   - decrease volume" << std::endl;
-        //     std::cout << "up     - increase volume" << std::endl;
-        // } else if (cmd_list.size() == 2 && cmd_list[0] == "sound") {
-        //     if (cmd_list[1] == "mute") {
-        //         previous_volume = music.getVolume();
-        //         music.setVolume(0);
-        //         std::cout << "muted" << std::endl;
-        //     } else if (cmd_list[1] == "unmute") {
-        //         music.setVolume(previous_volume);
-        //         std::cout << "unmuted. volume restored to " << previous_volume 
-        //                   << "%" << std::endl;
-        //     } else if (cmd_list[1] == "pause") {
-        //         music.pause();
-        //         std::cout << "sound paused" << std::endl;
-        //     } else if (cmd_list[1] == "resume") {
-        //         music.play();
-        //         std::cout << "sound resumed" << std::endl;
-        //     } else if (cmd_list[1] == "down") {
-        //         float current_volume = music.getVolume();
-        //         current_volume = std::max(0.0f, current_volume - 10.0f);
-        //         music.setVolume(current_volume);
-        //         std::cout << "sound volume decreased to " << current_volume 
-        //                   << "%" << std::endl;
-        //     } else if (cmd_list[1] == "up") {
-        //         float current_volume = music.getVolume();
-        //         current_volume = std::min(100.0f, current_volume + 10.0f);
-        //         music.setVolume(current_volume);
-        //         std::cout << "sound volume increased to " << current_volume 
-        //                   << "%" << std::endl;
-        //     } else {
-        //         std::cout << "unknown sound command: " << cmd_list[1] 
-        //                   << std::endl;
-            // }
-        // } 
+        else if (cmd_list[0] == "sound" && cmd_list.size() == 1) {
+            std::cout << "sound control commands:" << std::endl;
+            std::cout << "mute   - turn off the sound" << std::endl;
+            std::cout << "unmute - restore the previous sound volume" 
+                      << std::endl;
+            std::cout << "pause  - pause the sound playback" << std::endl;
+            std::cout << "resume - resume sound playback" << std::endl;
+            std::cout << "down   - decrease volume" << std::endl;
+            std::cout << "up     - increase volume" << std::endl;
+        } else if (cmd_list.size() == 2 && cmd_list[0] == "sound") {
+            if (cmd_list[1] == "mute") {
+                previous_volume = music.getVolume();
+                music.setVolume(0);
+                std::cout << "muted" << std::endl;
+            } else if (cmd_list[1] == "unmute") {
+                music.setVolume(previous_volume);
+                std::cout << "unmuted. volume restored to " << previous_volume 
+                          << "%" << std::endl;
+            } else if (cmd_list[1] == "pause") {
+                music.pause();
+                std::cout << "sound paused" << std::endl;
+            } else if (cmd_list[1] == "resume") {
+                music.play();
+                std::cout << "sound resumed" << std::endl;
+            } else if (cmd_list[1] == "down") {
+                float current_volume = music.getVolume();
+                current_volume = std::max(0.0f, current_volume - 10.0f);
+                music.setVolume(current_volume);
+                std::cout << "sound volume decreased to " << current_volume 
+                          << "%" << std::endl;
+            } else if (cmd_list[1] == "up") {
+                float current_volume = music.getVolume();
+                current_volume = std::min(100.0f, current_volume + 10.0f);
+                music.setVolume(current_volume);
+                std::cout << "sound volume increased to " << current_volume 
+                          << "%" << std::endl;
+            } else {
+                std::cout << "unknown sound command: " << cmd_list[1] 
+                          << std::endl;
+            }
+        } 
         else {
             std::cerr << "'";
             for (std::string& s : cmd_list) {
