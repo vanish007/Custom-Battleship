@@ -3,8 +3,9 @@ find_package(SFML 2.6.2 COMPONENTS audio system REQUIRED)
 add_executable(${PROJECT_NAME} main.cpp main.hpp)
 
 target_link_libraries(${PROJECT_NAME} 
-                            sfml-audio 
                             sfml-system
+                            sfml-audio 
+                            sfml-graphics
                             GameStats
                             Strategy
                             Field

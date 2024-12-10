@@ -5,7 +5,7 @@ add_library(GameStats
 add_library(Strategy 
             Strategy/strategy.cpp 
             Strategy/strategy.hpp)
-
+            
 add_library(Field 
             Field/field.cpp 
             Field/field.hpp 

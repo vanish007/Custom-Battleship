@@ -9,6 +9,7 @@
 #include <numeric>
 
 #include <SFML/Audio.hpp>
+#include <SFML/Graphics.hpp>
 #include <GameStats/game_stats.hpp>
 #include <Strategy/strategy.hpp>
 #include <Field/field.hpp>
