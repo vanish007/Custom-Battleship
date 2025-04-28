@@ -79,4 +79,4 @@
 При каждом запуске игры ваше приложение реализует стратегию только одного игрока (либо master, либо slave). Для полноценной игры требуется либо второе приложение, либо человек.
 
 ## Пример работы программы 
-[![Watch the video](https://img.youtube.com/vi/ИДЕНТИФИКАТОР/0.jpg)]([https://www.youtube.com/watch?v=ИДЕНТИФИКАТОР](https://drive.google.com/file/d/1O41nK95LBQ2zMv9CI-hu-0SmzKhCHME9/view?usp=sharing))
+[Watch the video](https://drive.google.com/file/d/1O41nK95LBQ2zMv9CI-hu-0SmzKhCHME9/view?usp=sharing)
